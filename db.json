@@ -1,0 +1,30 @@
+{
+  "users": [
+    {
+      "id": "90f1",
+      "fio": "Q",
+      "login": "1",
+      "password": "1",
+      "email": "Q",
+      "phone": "1",
+      "driverLicense": "Q",
+      "carNumber": "Q",
+      "photoDriver": "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/4E743CD0-E5D6-4063-AB5D-F304C0E4FE51.jpg",
+      "photoLicense": "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/53870C41-15DB-42D6-BF39-721CF99A8D09.png",
+      "photoSTS": "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/350E6F72-6537-4AAF-A3FE-BA08A20FEE17.png",
+      "photoOSAGO": "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/60347C60-2475-4A4A-9E82-5F9567EDCBA3.jpg",
+      "photoCar": [
+        "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/AD5A4471-923B-4AC5-8529-699D9D1F4E38.jpg",
+        "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/26136C15-87FC-4352-8F7B-AB5A8B03696D.jpg",
+        "file:///var/mobile/Containers/Data/Application/C13E93C8-6157-41F3-AB0D-B4A5D307AD52/Library/Caches/ExponentExperienceData/@anonymous/Kars-drive-d405f8d5-ad93-41dc-b35e-549104706722/ImagePicker/642F9E40-2BF7-49D1-85B5-6EC77F764067.jpg"
+      ],
+      "equipment": [
+        "Детское кресло",
+        "Рейлинги",
+        "Багажный бокс"
+      ],
+      "role": "driver",
+      "status": "approved"
+    }
+  ]
+}

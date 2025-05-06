@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import CustomInput from '../../shared/ui/CustomInput';
-import PasswordInput from '../../shared/ui/PasswordInput';
-import CustomButton from '../../shared/ui/CustomButton';
-import Logo from '../../shared/ui/Logo';
+import CustomInput from '../../../shared/ui/CustomInput';
+import PasswordInput from '../../../shared/ui/PasswordInput';
+import CustomButton from '../../../shared/ui/CustomButton';
+import Logo from '../../../shared/ui/Logo';
 import { paddings } from '@/shared/theme/paddings';
 import { colors } from '@/shared/theme/colors';
 import { margins } from '@/shared/theme/margins';
@@ -12,6 +12,10 @@ import { fonts } from '@/shared/theme/fonts';
 import { gaps } from '@/shared/theme/gaps';
 import PhotoUpload from '@/shared/ui/PhotoUpload';
 import CheckBoxGroup from '@/shared/ui/CheckBoxGroup';
+import { Alert } from 'react-native';
+import { BASE_URL } from '@/shared/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 export default function DriverRegister() {
   const router = useRouter();
@@ -31,10 +35,54 @@ export default function DriverRegister() {
   const [photoOSAGO, setPhotoOSAGO] = useState(null);
   const [photoCar, setPhotoCar] = useState(null);
 
-  const handleRegister = () => {
-    // TODO: Авторизация через json-server
-    // console.log('Login:', login);
-    // console.log('Password:', password);
+  const handleRegister = async () => {
+    if (!fio || !phone || !email || !password || !repeatPassword || !driverLicense || !carNumber) {
+      Alert.alert('Ошибка', 'Пожалуйста, заполните все обязательные поля');
+      return;
+    }
+
+    if (password !== repeatPassword) {
+      Alert.alert('Ошибка', 'Пароли не совпадают');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BASE_URL}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fio,
+          login: phone, // или email, если логин по нему
+          password,
+          email,
+          phone,
+          driverLicense,
+          carNumber,
+          photoDriver,
+          photoLicense,
+          photoSTS,
+          photoOSAGO,
+          photoCar,
+          equipment,
+          role: 'driver',
+          status: 'pending'
+        }),
+      });
+
+      if (response.ok) {
+        const newUser = await response.json();
+        
+        await AsyncStorage.setItem('userId', String(newUser.id));
+        await AsyncStorage.setItem('role', newUser.role);
+
+        router.replace(`/driver/status?status=pending`);
+      } else {
+        Alert.alert('Ошибка', 'Не удалось зарегистрировать пользователя');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Ошибка', 'Ошибка соединения с сервером');
+    }
   };
 
   return (
@@ -56,7 +104,7 @@ export default function DriverRegister() {
         <PhotoUpload label="Фото ВУ" hint="Обратите внимание: фото водительского удостоверения должно быть четким" photo={photoLicense} onUpload={setPhotoLicense} />
         <PhotoUpload label="Фото СТС" hint="Обратите внимание: фото свидетельства о регистрации ТС должно быть четким" photo={photoSTS} onUpload={setPhotoSTS} />
         <PhotoUpload label="Фото ОСАГО" hint="Обратите внимание: фото полиса должно быть читаемым" photo={photoOSAGO} onUpload={setPhotoOSAGO} />
-        <PhotoUpload label="Фото транспорта" photo={photoCar} onUpload={setPhotoCar} multiple/>
+        <PhotoUpload label="Фото транспорта" photo={photoCar} onUpload={setPhotoCar} multiple />
 
         <CheckBoxGroup
           label="Наличие дополнительного оборудования"
@@ -71,7 +119,7 @@ export default function DriverRegister() {
 
         <View style={styles.bottomContainer}>
           <Text style={styles.text}>Уже зарегистрированы? </Text>
-          <Pressable onPress={() => router.push('/driver/register')}>
+          <Pressable onPress={() => router.push('/driver/auth/login')}>
             <Text style={styles.link}>Войти</Text>
           </Pressable>
         </View>
