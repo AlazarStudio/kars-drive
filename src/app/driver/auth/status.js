@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import CustomButton from '@/shared/ui/CustomButton';
 import { colors } from '@/shared/theme/colors';
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: Platform.OS == 'android' && 20
+    paddingTop: 20
   },
   logo: {
     fontSize: 18,
