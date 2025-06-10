@@ -22,7 +22,6 @@ export default function DriverLogin() {
     try {
       const response = await fetch(`${BASE_URL}/users?login=${login}&password=${password}`);
       const users = await response.json();
-
       if (users.length === 0) {
         Alert.alert('Ошибка', 'Неверный логин или пароль');
         return;

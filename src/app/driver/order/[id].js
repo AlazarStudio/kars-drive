@@ -91,7 +91,15 @@ export default function OrderDetailsScreen() {
       longitude: location.coords.longitude,
     };
     setMyCoords(coords);
+
+    // Центрировать карту
+    mapRef.current?.animateToRegion({
+      ...coords,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    }, 500);
   };
+
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{
@@ -137,12 +145,13 @@ export default function OrderDetailsScreen() {
           style={StyleSheet.absoluteFill}
           initialRegion={{ ...fromCoords, latitudeDelta: 0.1, longitudeDelta: 0.1 }}
         >
-          <Marker coordinate={fromCoords} title="Откуда" />
-          <Marker coordinate={toCoords} title="Куда" />
           {
             myCoords && (
               <Marker coordinate={myCoords}>
-                <View style={styles.userLocationDot} />
+                <Image
+                  source={require('@/shared/assets/icons/car-icon.png')}
+                  style={styles.carIcon}
+                />
               </Marker>
             )}
           {
@@ -257,8 +266,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 20, padding: 8, elevation: 5,
   },
   locateButton: {
-    position: 'absolute', bottom: 100, right: 20, zIndex: 10,
+    position: 'absolute', top: 50, right: 20, zIndex: 10,
     backgroundColor: '#fff', padding: 10, borderRadius: 30, elevation: 5,
+  },
+  carIcon: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   detailsButton: {
     position: 'absolute', bottom: 30, alignSelf: 'center',
