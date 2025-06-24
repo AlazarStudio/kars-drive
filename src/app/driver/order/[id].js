@@ -217,9 +217,9 @@ export default function OrderDetailsScreen() {
         longitude: geoData.features[0].geometry.coordinates[0],
       };
 
-      console.log('📍 Строим маршрут от:', location, 'до:', destCoords);
+      // console.log('📍 Строим маршрут от:', location, 'до:', destCoords);
 
-      const osrmUrl = `http://router.project-osrm.org/route/v1/driving/${location.longitude},${location.latitude};${destCoords.longitude},${destCoords.latitude}?overview=full&geometries=geojson`;
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${location.longitude},${location.latitude};${destCoords.longitude},${destCoords.latitude}?overview=full&geometries=geojson`;
       const routeRes = await fetch(osrmUrl);
       const routeData = await routeRes.json();
 
@@ -282,7 +282,7 @@ export default function OrderDetailsScreen() {
             typeof newHeading === 'number' &&
             !isNaN(newHeading) &&
             (lastHeading.current === null || Math.abs(newHeading - lastHeading.current) > 3) &&
-            now - lastUpdateTime.current > 500
+            now - lastUpdateTime.current > 1500
           ) {
             setCurrentHeading(newHeading);
             lastHeading.current = newHeading;
