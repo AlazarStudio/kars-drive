@@ -24,23 +24,33 @@
         "Багажный бокс"
       ],
       "role": "driver",
-      "status": "approved"
+      "status": "approved",
+      "onOrder": "1"
+    }
+  ],
+  "clients": [
+    {
+      "id": "1123",
+      "fullName": "Иванов Иван Иванович",
+      "position": "КВС",
+      "rating": 5
     }
   ],
   "orders": [
     {
-      "id": 1,
+      "id": "1",
       "driverId": "90f1",
+      "clientId": "1123",
       "avatar": "https://randomuser.me/api/portraits/men/32.jpg",
       "fullName": "Александр",
-      "rating": 5.0,
+      "rating": 5,
       "from": "проспект Ленина, 67, Черкесск, Карачаево-Черкесская Республика, Россия",
       "to": "улица Ленина, 61К1, Минеральные Воды, Ставропольский край, Россия",
-      "departureTime": "2025-03-13T12:12:00",
+      "departureTime": "2025-06-23T12:12:00",
       "comment": "Нужна машина на 2 места и питомца",
       "baggageInfo": "2 чемодана и клетка 40×50",
-      "status": "pending",
-      "isActive": false
+      "status": "active",
+      "isActive": true
     }
   ]
 }

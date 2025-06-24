@@ -11,6 +11,11 @@ import useCurrentLocation from '@/map/hooks/useCurrentLocation';
 import useRoute from '@/map/hooks/useRoute';
 import MyLocationButton from '@/map/MyLocationButton';
 import RouteControlPanel from '@/map/RouteControlPanel';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import RoutePolyline from '@/map/RoutePolyline';
+import { Polyline } from 'react-native-maps';
+import WaypointMarker from '@/map/WaypointMarker';
+import * as Location from 'expo-location';
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -30,6 +35,12 @@ export default function OrderDetailsScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [initialRegionSet, setInitialRegionSet] = useState(false);
   const [hasCenteredRoute, setHasCenteredRoute] = useState(false); // 🆕 флаг
+
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [currentHeading, setCurrentHeading] = useState(null);
+  const lastHeading = useRef(null);
+  const lastUpdateTime = useRef(Date.now());
+  const locationSubscription = useRef(null);
 
   const { routeCoords, distance, duration } = useRoute(
     location ? { latitude: location.latitude, longitude: location.longitude } : null,
@@ -93,8 +104,8 @@ export default function OrderDetailsScreen() {
         {
           latitude: location.latitude,
           longitude: location.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
         },
         1000
       );
@@ -123,6 +134,7 @@ export default function OrderDetailsScreen() {
         const res = await fetch(`${BASE_URL}/orders/${id}`);
         const data = await res.json();
         setOrder(data);
+        setAccepted(data.isActive);
         setTimeout(() => bottomSheetRef.current?.present(), 100);
       } catch (error) {
         console.error('Ошибка загрузки заказа:', error);
@@ -142,6 +154,164 @@ export default function OrderDetailsScreen() {
     }),
   }));
 
+  const handleAcceptOrder = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isActive: true,
+          status: 'active',
+        }),
+      });
+
+      const userId = await AsyncStorage.getItem('userId');
+      const resUser = await fetch(`${BASE_URL}/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          onOrder: id,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Ошибка при принятии заказа');
+      if (!resUser.ok) throw new Error('Ошибка при принятии заказа');
+
+      const updatedOrder = await res.json();
+      const updatedUser = await resUser.json();
+      setOrder(updatedOrder);
+      setAccepted(true);
+    } catch (error) {
+      console.error('Не удалось обновить заказ:', error);
+    }
+  };
+
+  const buildRouteToOrder = async () => {
+    try {
+      bottomSheetRef.current?.dismiss();
+
+      if (!order || !order.from) {
+        Alert.alert('Ошибка', 'Нет адреса клиента');
+        return;
+      }
+
+      if (!location || !location.latitude || !location.longitude) {
+        Alert.alert('Ошибка', 'Ожидаем геопозицию. Попробуйте ещё раз через пару секунд');
+        return;
+      }
+
+      const geoRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(order.from)}&lang=default&limit=1`);
+      const geoData = await geoRes.json();
+
+      if (!geoData.features || geoData.features.length === 0) {
+        Alert.alert('Ошибка', 'Адрес клиента не найден');
+        return;
+      }
+
+      const destCoords = {
+        latitude: geoData.features[0].geometry.coordinates[1],
+        longitude: geoData.features[0].geometry.coordinates[0],
+      };
+
+      console.log('📍 Строим маршрут от:', location, 'до:', destCoords);
+
+      const osrmUrl = `http://router.project-osrm.org/route/v1/driving/${location.longitude},${location.latitude};${destCoords.longitude},${destCoords.latitude}?overview=full&geometries=geojson`;
+      const routeRes = await fetch(osrmUrl);
+      const routeData = await routeRes.json();
+
+      if (!routeData.routes || routeData.routes.length === 0) {
+        Alert.alert('Ошибка', 'Не удалось построить маршрут (OSRM не дал данных)');
+        return;
+      }
+
+      const coords = routeData.routes[0].geometry.coordinates.map(([lon, lat]) => ({
+        latitude: lat,
+        longitude: lon,
+      }));
+
+      setDestinationPoints([destCoords]);
+      setBuildRoute(true);
+      setSearchPreviewMarker(null);
+      setHasCenteredRoute(false);
+
+      setTimeout(() => {
+        mapRef.current?.animateCamera({
+          center: coords[0],
+          heading: location.heading || 0,
+          pitch: 0,
+          altitude: 1000,
+        });
+      }, 300);
+
+    } catch (err) {
+      console.error('❌ Ошибка построения маршрута:', err);
+      Alert.alert('Ошибка', 'Не удалось построить маршрут до клиента');
+    }
+  };
+
+
+  const startNavigation = async () => {
+    if (isNavigating || !location) return;
+
+    try {
+      bottomSheetRef.current?.dismiss();
+      setIsNavigating(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Ошибка', 'Нет доступа к геопозиции');
+        return;
+      }
+
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Highest,
+          timeInterval: 500,
+          distanceInterval: 0,
+        },
+        (pos) => {
+          const newHeading = pos.coords.heading;
+          const now = Date.now();
+
+          // 🔄 Обновляем heading, но не location напрямую
+          if (
+            typeof newHeading === 'number' &&
+            !isNaN(newHeading) &&
+            (lastHeading.current === null || Math.abs(newHeading - lastHeading.current) > 3) &&
+            now - lastUpdateTime.current > 500
+          ) {
+            setCurrentHeading(newHeading);
+            lastHeading.current = newHeading;
+            lastUpdateTime.current = now;
+          }
+
+          // 🔁 Вращаем карту по heading
+          if (mapRef.current) {
+            mapRef.current.animateCamera({
+              center: {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+              },
+              heading: newHeading || 0,
+              pitch: 0,
+              altitude: 1000,
+            });
+          }
+        }
+      );
+    } catch (err) {
+      console.error('Ошибка запуска навигации:', err);
+      Alert.alert('Ошибка', 'Не удалось включить навигацию');
+      setIsNavigating(false);
+    }
+  };
+
+
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
@@ -154,7 +324,9 @@ export default function OrderDetailsScreen() {
         >
           {buildRoute && (
             <>
-              <RoutePolyline coordinates={routeCoords} />
+              {/* <RoutePolyline coordinates={routeCoords} /> */}
+              <Polyline coordinates={routeCoords} strokeWidth={6} strokeColor="#007AFF" />
+
               {destinationPoints.map((point, index) => (
                 <WaypointMarker
                   key={index}
@@ -257,15 +429,32 @@ export default function OrderDetailsScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.acceptButton}
-                onPress={() => setAccepted(true)}
+                onPress={handleAcceptOrder}
               >
                 <Text style={styles.acceptText}>Принять заказ</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity style={styles.acceptButton}>
-              <Text style={styles.acceptText}>Выполнить заказ</Text>
-            </TouchableOpacity>
+            <>
+              {accepted && location && (
+                <TouchableOpacity
+                  style={styles.acceptButton}
+                  onPress={buildRouteToOrder}
+                >
+                  <Text style={styles.acceptText}>Построить маршрут до клиента</Text>
+                </TouchableOpacity>
+              )}
+
+
+              {buildRoute && !isNavigating && (
+                <TouchableOpacity
+                  style={[styles.acceptButton, { marginTop: 10 }]}
+                  onPress={startNavigation}
+                >
+                  <Text style={styles.acceptText}>Начать навигацию</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </BottomActionBar>
       </View>

@@ -44,7 +44,7 @@ export default function HomeScreen() {
     };
 
     fetchOrders();
-  }, []);
+  }, [orders]);
 
   useEffect(() => {
     setFilteredOrders(orders);
@@ -72,8 +72,8 @@ export default function HomeScreen() {
 
           <RoutePath from={activeOrder.from} to={activeOrder.to} outerColor="white" innerColor="#38bdf8" textColor="#fff" />
 
-          <TouchableOpacity style={styles.activeButton}>
-            <Text style={styles.activeButtonText}>На месте</Text>
+          <TouchableOpacity style={styles.activeButton} onPress={() => router.push(`/driver/order/${activeOrder.id}`)}>
+            <Text style={styles.activeButtonText}>Вернуться к заказу</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -97,6 +97,7 @@ export default function HomeScreen() {
 
 
         )}
+        
         ListEmptyComponent={<Text style={{ textAlign: 'center' }}>Больше заказов нет</Text>}
       />
     </SafeAreaView>
