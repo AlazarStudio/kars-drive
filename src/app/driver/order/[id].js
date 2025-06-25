@@ -10,9 +10,7 @@ import CustomMapView from '@/map/CustomMapView';
 import useCurrentLocation from '@/map/hooks/useCurrentLocation';
 import useRoute from '@/map/hooks/useRoute';
 import MyLocationButton from '@/map/MyLocationButton';
-import RouteControlPanel from '@/map/RouteControlPanel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import RoutePolyline from '@/map/RoutePolyline';
 import { Polyline } from 'react-native-maps';
 import WaypointMarker from '@/map/WaypointMarker';
 import * as Location from 'expo-location';
@@ -82,12 +80,10 @@ export default function OrderDetailsScreen() {
         },
         1000
       );
-      setIsFollowing(true);
+      // setIsFollowing(true);
     }
   }, [location, initialRegionSet]);
 
-
-  // Масштабируем маршрут только один раз
   useEffect(() => {
     if (buildRoute && !hasCenteredRoute && routeCoords.length > 1 && mapRef.current) {
       mapRef.current.fitToCoordinates(routeCoords, {
@@ -98,38 +94,12 @@ export default function OrderDetailsScreen() {
     }
   }, [buildRoute, hasCenteredRoute, routeCoords]);
 
-  const handleRecenter = () => {
-    if (mapRef.current && location) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        },
-        1000
-      );
-      setIsFollowing(true);
-    }
-  };
-
   const handleMapInteraction = () => {
     if (isFollowing) {
       setIsFollowing(false);
       locationSubscription.current?.remove();
       locationSubscription.current = null;
     }
-  };
-
-  const handleAddPoint = (point) => {
-    setDestinationPoints(prev => [...prev, point]);
-  };
-
-  const handleBuildRoute = (points) => {
-    setDestinationPoints(points);
-    setBuildRoute(true);
-    setSearchPreviewMarker(null);
-    setHasCenteredRoute(false); // 🆕 сбрасываем флаг
   };
 
   useEffect(() => {
@@ -140,18 +110,11 @@ export default function OrderDetailsScreen() {
         setOrder(data);
         setAccepted(data.isActive);
 
-        setTimeout(() => bottomSheetRef.current?.present(), 100);
+        (data.status == 'pending' || data.status == 'arrived') && setTimeout(() => bottomSheetRef.current?.present(), 100)
+        data.status == 'active' && setTimeout(() => bottomSheetRef.current?.dismiss(), 100)
 
         if (data.status === 'active') {
           setAccepted(true);
-
-          // 🔁 Ждём появления геопозиции
-          const interval = setInterval(() => {
-            if (location && location.latitude && location.longitude) {
-              clearInterval(interval);
-              buildRouteToOrder(); // 🚀 Строим маршрут при повторном входе
-            }
-          }, 500);
         }
       } catch (error) {
         console.error('Ошибка загрузки заказа:', error);
@@ -201,6 +164,28 @@ export default function OrderDetailsScreen() {
 
       const updatedOrder = await res.json();
       const updatedUser = await resUser.json();
+      setOrder(updatedOrder);
+      setAccepted(true);
+    } catch (error) {
+      console.error('Не удалось обновить заказ:', error);
+    }
+  };
+
+  const handleArrivedOrder = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'arrived',
+        }),
+      });
+
+      if (!res.ok) throw new Error('Ошибка при принятии заказа');
+
+      const updatedOrder = await res.json();
       setOrder(updatedOrder);
       setAccepted(true);
     } catch (error) {
@@ -272,6 +257,7 @@ export default function OrderDetailsScreen() {
   };
 
   const toggleFollowAndRotate = async () => {
+    bottomSheetRef.current?.dismiss();
     if (isFollowing) {
       setIsFollowing(false);
       locationSubscription.current?.remove();
@@ -320,6 +306,19 @@ export default function OrderDetailsScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      order &&
+      order.status === 'active' &&
+      location &&
+      location.latitude &&
+      location.longitude &&
+      !buildRoute
+    ) {
+      buildRouteToOrder();
+    }
+  }, [order, location]);
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
@@ -332,7 +331,6 @@ export default function OrderDetailsScreen() {
         >
           {buildRoute && (
             <>
-              {/* <RoutePolyline coordinates={routeCoords} /> */}
               <Polyline coordinates={routeCoords} strokeWidth={6} strokeColor="#007AFF" />
 
               {destinationPoints.map((point, index) => (
@@ -354,13 +352,6 @@ export default function OrderDetailsScreen() {
           isFollowing={isFollowing}
           style={styles.myButton}
         />
-
-        {/* <RouteControlPanel
-          mapRef={mapRef}
-          onAddPoint={handleAddPoint}
-          onBuildRoute={handleBuildRoute}
-          onPreview={setSearchPreviewMarker}
-        /> */}
 
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -430,30 +421,41 @@ export default function OrderDetailsScreen() {
         </BottomSheetModal>
 
         <BottomActionBar animatedStyle={animatedStyle}>
-          {!accepted ? (
-            <>
-              <TouchableOpacity style={styles.rejectButton}>
-                <Text style={styles.rejectText}>Отклонить</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.acceptButton}
-                onPress={handleAcceptOrder}
-              >
-                <Text style={styles.acceptText}>Принять заказ</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              {accepted && location && (
+          <>
+            {order?.status == 'pending' && !accepted && (
+              <>
+                <TouchableOpacity style={styles.rejectButton}>
+                  <Text style={styles.rejectText}>Отклонить</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.acceptButton}
-                  onPress={buildRouteToOrder}
+                  onPress={handleAcceptOrder}
                 >
-                  <Text style={styles.acceptText}>Построить маршрут до клиента</Text>
+                  <Text style={styles.acceptText}>Принять заказ</Text>
                 </TouchableOpacity>
-              )}
-            </>
-          )}
+              </>
+            )}
+
+            {order?.status == 'active' && accepted && location && (
+              <>
+                <TouchableOpacity style={styles.rejectButton}>
+                  <Text style={styles.rejectText}>Отклонить</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.acceptButton} onPress={handleArrivedOrder}>
+                  <Text style={styles.acceptText}>На месте</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {order?.status == 'arrived' &&
+              <>
+                <TouchableOpacity style={styles.acceptButton}>
+                  <Text style={styles.acceptText}>Начать поездку</Text>
+                </TouchableOpacity>
+              </>
+            }
+
+          </>
         </BottomActionBar>
       </View>
     </TouchableWithoutFeedback>
