@@ -29,8 +29,10 @@ export default function HomeScreen() {
         const res = await fetch(`${BASE_URL}/orders?driverId=${userId}`);
         const data = await res.json();
 
-        const active = data.find(order => order.isActive);
-        const upcoming = data
+        const filtered = data.filter(order => order.status !== 'cancelled' && order.status !== 'ended');
+
+        const active = filtered.find(order => order.isActive);
+        const upcoming = filtered
           .filter(order => !order.isActive)
           .sort((a, b) => new Date(a.departureTime) - new Date(b.departureTime));
 

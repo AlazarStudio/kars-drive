@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Polyline } from 'react-native-maps';
 import WaypointMarker from '@/map/WaypointMarker';
 import * as Location from 'expo-location';
+import { BallIndicator } from 'react-native-indicators';
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -33,6 +34,7 @@ export default function OrderDetailsScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [initialRegionSet, setInitialRegionSet] = useState(false);
   const [hasCenteredRoute, setHasCenteredRoute] = useState(false); // 🆕 флаг
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
 
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentHeading, setCurrentHeading] = useState(null);
@@ -110,8 +112,16 @@ export default function OrderDetailsScreen() {
         setOrder(data);
         setAccepted(data.isActive);
 
-        (data.status == 'pending' || data.status == 'arrived') && setTimeout(() => bottomSheetRef.current?.present(), 100)
-        data.status == 'active' && setTimeout(() => bottomSheetRef.current?.dismiss(), 100)
+        if (data.status == 'pending' || data.status == 'arrived' || data.status == 'ended') {
+          setTimeout(() => {
+            bottomSheetRef.current?.present();
+          }, 100);
+        }
+        if (data.status == 'active' || data.status == 'started') {
+          setTimeout(() => {
+            bottomSheetRef.current?.dismiss();
+          }, 100);
+        }
 
         if (data.status === 'active') {
           setAccepted(true);
@@ -193,11 +203,80 @@ export default function OrderDetailsScreen() {
     }
   };
 
-  const buildRouteToOrder = async () => {
+  const handleStartedOrder = async () => {
     try {
+      const res = await fetch(`${BASE_URL}/orders/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'started',
+        }),
+      });
+
+      if (!res.ok) throw new Error('Ошибка при принятии заказа');
+
+      const updatedOrder = await res.json();
+      setOrder(updatedOrder);
+      setAccepted(true);
+    } catch (error) {
+      console.error('Не удалось обновить заказ:', error);
+    }
+  };
+
+  const handleEndedOrder = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'ended',
+          isActive: false
+        }),
+      });
+
+      const userId = await AsyncStorage.getItem('userId');
+      const resUser = await fetch(`${BASE_URL}/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          onOrder: "",
+        }),
+      });
+
+      if (!res.ok) throw new Error('Ошибка при принятии заказа');
+      if (!resUser.ok) throw new Error('Ошибка при принятии заказа');
+
+      const updatedOrder = await res.json();
+      const updatedUser = await resUser.json();
+
+      setOrder(updatedOrder);
+      setAccepted(true);
+
+      toggleFollowAndRotate(true)
+    } catch (error) {
+      console.error('Не удалось обновить заказ:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (order && (order.status === 'active' || order.status === 'started')) {
+      setBuildRoute(false); // сбросить перед следующим построением
+    }
+  }, [order]);
+
+  const buildRouteToOrder = async (comePlace) => {
+    try {
+      setIsRouteLoading(true);
+
       bottomSheetRef.current?.dismiss();
 
-      if (!order || !order.from) {
+      if (!order || !comePlace) {
         Alert.alert('Ошибка', 'Нет адреса клиента');
         return;
       }
@@ -207,7 +286,7 @@ export default function OrderDetailsScreen() {
         return;
       }
 
-      const geoRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(order.from)}&lang=default&limit=1`);
+      const geoRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(comePlace)}&lang=default&limit=1`);
       const geoData = await geoRes.json();
 
       if (!geoData.features || geoData.features.length === 0) {
@@ -248,16 +327,19 @@ export default function OrderDetailsScreen() {
           pitch: 0,
           altitude: 1000,
         });
-      }, 300);
+      }, 500);
 
     } catch (err) {
       console.error('❌ Ошибка построения маршрута:', err);
       Alert.alert('Ошибка', 'Не удалось построить маршрут до клиента');
+    } finally {
+      setIsRouteLoading(false); // 👉 выключаем всегда
     }
   };
 
-  const toggleFollowAndRotate = async () => {
-    bottomSheetRef.current?.dismiss();
+  const toggleFollowAndRotate = async (show) => {
+    if (!show) { bottomSheetRef.current?.dismiss() }
+
     if (isFollowing) {
       setIsFollowing(false);
       locationSubscription.current?.remove();
@@ -308,6 +390,16 @@ export default function OrderDetailsScreen() {
 
   useEffect(() => {
     if (
+      order && (order.status === 'pending' || order.status === 'arrived' || order.status === 'ended')
+    ) {
+      // console.log(order.status)
+      setDestinationPoints([]);
+      setBuildRoute(false);
+      setHasCenteredRoute(false);
+      toggleFollowAndRotate(true)
+    }
+
+    if (
       order &&
       order.status === 'active' &&
       location &&
@@ -315,16 +407,34 @@ export default function OrderDetailsScreen() {
       location.longitude &&
       !buildRoute
     ) {
-      buildRouteToOrder();
+      buildRouteToOrder(order.from);
+    }
+
+    if (
+      order &&
+      order.status === 'started' &&
+      location &&
+      location.latitude &&
+      location.longitude &&
+      !buildRoute
+    ) {
+      buildRouteToOrder(order.to);
     }
   }, [order, location]);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
+        {isRouteLoading && (
+          <View style={styles.loaderOverlay}>
+            <View style={styles.loaderBox}>
+              <BallIndicator color="#007AFF" size={50} />
+            </View>
+          </View>
+        )}
 
         <CustomMapView
-          key={buildRoute ? 'map-with-route' : 'map-empty'}
+          // key={buildRoute ? 'map-with-route' : 'map-empty'}
           mapRef={mapRef}
           initialRegion={initialRegion}
           onPanDrag={handleMapInteraction}
@@ -333,18 +443,18 @@ export default function OrderDetailsScreen() {
             <>
               <Polyline coordinates={routeCoords} strokeWidth={6} strokeColor="#007AFF" />
 
-              {destinationPoints.map((point, index) => (
+              {/* {destinationPoints.map((point, index) => (
                 <WaypointMarker
                   key={index}
                   coordinate={point}
                   label={`Точка ${index + 1}`}
                 />
-              ))}
+              ))} */}
             </>
           )}
-          {searchPreviewMarker && (
+          {/* {searchPreviewMarker && (
             <WaypointMarker coordinate={searchPreviewMarker} label="Найдено" />
-          )}
+          )} */}
         </CustomMapView>
 
         <MyLocationButton
@@ -373,16 +483,31 @@ export default function OrderDetailsScreen() {
           <BottomSheetScrollView contentContainerStyle={styles.content}>
             {order ? (
               <>
-                <View style={styles.avatarSection}>
-                  <View style={styles.avatarWrapper}>
-                    <Image source={{ uri: order.avatar }} style={styles.avatar} />
+                {order.status !== 'pending' &&
+                  <View style={styles.infoTopBlock}>
+                    {order.status == 'active' && <Text style={styles.infoTopBlock_text}>Время до подачи 4 мин.</Text>}
+                    {order.status == 'arrived' && <Text style={styles.infoTopBlock_text}>Время ожидания 01:30 </Text>}
+                    {order.status == 'started' && <Text style={styles.infoTopBlock_text}>Время в пути 01:30 </Text>}
                   </View>
-                  <Text style={styles.name}>
-                    {order.fullName} ⭐️ {order.rating?.toFixed(1) ?? '—'}
-                  </Text>
+                }
+
+                <View style={styles.topSelection}>
+                  <View style={styles.avatarSection}>
+                    <View style={styles.avatarWrapper}>
+                      <Image source={{ uri: order.avatar }} style={styles.avatar} />
+                    </View>
+                    <View style={styles.nameBlock}>
+                      <Text style={styles.name}>{order.fullNameClient}</Text>
+                      <Text style={styles.rating}>★ {order.ratingClient?.toFixed(1) ?? '—'}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.buttonWrapper}>
+                    <Image source={require('@/shared/assets/icons/message.png')} style={styles.buttonAvatar} />
+                  </View>
                 </View>
 
-                <Text style={styles.status}>Ожидает принятия</Text>
+                {order.status == 'pending' && <Text style={styles.status}>Ожидает принятия</Text>}
 
                 <View style={styles.routeWrapper}>
                   <View style={styles.routeIcons}>
@@ -449,8 +574,24 @@ export default function OrderDetailsScreen() {
 
             {order?.status == 'arrived' &&
               <>
-                <TouchableOpacity style={styles.acceptButton}>
+                <TouchableOpacity style={styles.acceptButton} onPress={handleStartedOrder}>
                   <Text style={styles.acceptText}>Начать поездку</Text>
+                </TouchableOpacity>
+              </>
+            }
+
+            {order?.status == 'started' &&
+              <>
+                <TouchableOpacity style={styles.acceptButton} onPress={handleEndedOrder}>
+                  <Text style={styles.acceptText}>Завершить поездку</Text>
+                </TouchableOpacity>
+              </>
+            }
+
+            {order?.status == 'ended' &&
+              <>
+                <TouchableOpacity style={styles.acceptButton}>
+                  <Text style={styles.acceptText}>Оценить</Text>
                 </TouchableOpacity>
               </>
             }
@@ -458,7 +599,7 @@ export default function OrderDetailsScreen() {
           </>
         </BottomActionBar>
       </View>
-    </TouchableWithoutFeedback>
+    </TouchableWithoutFeedback >
   );
 }
 
@@ -485,26 +626,71 @@ const styles = StyleSheet.create({
   content: {
     padding: 16, paddingBottom: 100
   },
+  infoTopBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 20,
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8EDF1'
+  },
+  infoTopBlock_text: {
+    fontSize: 20,
+    fontWeight: "600",
+    fontStyle: "normal",
+    color: "#000000"
+  },
+  topSelection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10
+  },
   avatarSection: {
-    alignItems: 'center', marginBottom: 12
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
   },
   avatarWrapper: {
-    width: 64, height: 64, borderRadius: 32, overflow: 'hidden', marginBottom: 8
+    width: 42, height: 42, borderRadius: 32, overflow: 'hidden'
   },
   avatar: {
     width: '100%', height: '100%', resizeMode: 'cover'
   },
+
+  buttonWrapper: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: "#EFEFF0",
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  buttonAvatar: {
+    width: '50%', height: '50%', resizeMode: 'cover'
+  },
+  nameBlock: {
+    flexDirection: 'column',
+    gap: 2
+  },
   name: {
     fontWeight: 'bold', fontSize: 16
   },
+  rating: {
+    fontWeight: 'bold', fontSize: 14, color: '#999999'
+  },
   status: {
-    backgroundColor: '#FFF1A6', padding: 10, borderRadius: 8, marginVertical: 8, textAlign: 'center', fontWeight: '500'
+    backgroundColor: '#FFF1A6', padding: 10, borderRadius: 8, marginVertical: 8, textAlign: 'center', fontWeight: '500', marginBottom: 10
   },
   infoRow: {
-    marginVertical: 6
+    marginVertical: 6,
+    marginBottom: 10
   },
   label: {
-    fontWeight: 'bold', marginBottom: 4
+    fontWeight: 'bold', marginBottom: 4, marginBottom: 10
   },
   value: {
     fontSize: 14, color: '#444', backgroundColor: '#F2F2F2', padding: 8, borderRadius: 6
@@ -524,6 +710,7 @@ const styles = StyleSheet.create({
   routeWrapper: {
     flexDirection: 'row',
     gap: 15,
+    marginBottom: 10
   },
   routeIcons: {
     alignItems: 'center',
@@ -550,5 +737,22 @@ const styles = StyleSheet.create({
   },
   point: {
     fontSize: 14,
-  }
+  },
+  loaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.52)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loaderBox: {
+    padding: 20,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  loaderText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
 });

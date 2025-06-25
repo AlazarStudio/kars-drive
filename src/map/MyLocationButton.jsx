@@ -9,7 +9,7 @@ export default function MyLocationButton({ onPress, style, isFollowing }) {
       style={[styles.button, style]}
     >
       <Ionicons name="locate" size={20} color="white" />
-      {!isFollowing && <Text style={styles.text}>Где я?</Text>}
+      {!isFollowing && <Text style={styles.text}>В путь</Text>}
     </TouchableOpacity>
   );
 }
