@@ -139,11 +139,25 @@ export default function OrderDetailsScreen() {
         const data = await res.json();
         setOrder(data);
         setAccepted(data.isActive);
+
         setTimeout(() => bottomSheetRef.current?.present(), 100);
+
+        if (data.status === 'active') {
+          setAccepted(true);
+
+          // 🔁 Ждём появления геопозиции
+          const interval = setInterval(() => {
+            if (location && location.latitude && location.longitude) {
+              clearInterval(interval);
+              buildRouteToOrder(); // 🚀 Строим маршрут при повторном входе
+            }
+          }, 500);
+        }
       } catch (error) {
         console.error('Ошибка загрузки заказа:', error);
       }
     };
+
     fetchOrder();
   }, [id]);
 
