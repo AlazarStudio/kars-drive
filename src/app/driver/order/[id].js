@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Keyboard, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, TouchableWithoutFeedback } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
@@ -428,13 +428,12 @@ export default function OrderDetailsScreen() {
         {isRouteLoading && (
           <View style={styles.loaderOverlay}>
             <View style={styles.loaderBox}>
-              <BallIndicator color="#007AFF" size={50} />
+              <ActivityIndicator color="#007AFF" size={100} />
             </View>
           </View>
         )}
 
         <CustomMapView
-          // key={buildRoute ? 'map-with-route' : 'map-empty'}
           mapRef={mapRef}
           initialRegion={initialRegion}
           onPanDrag={handleMapInteraction}
@@ -443,18 +442,15 @@ export default function OrderDetailsScreen() {
             <>
               <Polyline coordinates={routeCoords} strokeWidth={6} strokeColor="#007AFF" />
 
-              {/* {destinationPoints.map((point, index) => (
+              {destinationPoints.map((point, index) => (
                 <WaypointMarker
                   key={index}
                   coordinate={point}
                   label={`Точка ${index + 1}`}
                 />
-              ))} */}
+              ))}
             </>
           )}
-          {/* {searchPreviewMarker && (
-            <WaypointMarker coordinate={searchPreviewMarker} label="Найдено" />
-          )} */}
         </CustomMapView>
 
         <MyLocationButton
@@ -546,57 +542,54 @@ export default function OrderDetailsScreen() {
         </BottomSheetModal>
 
         <BottomActionBar animatedStyle={animatedStyle}>
-          <>
-            {order?.status == 'pending' && !accepted && (
-              <>
-                <TouchableOpacity style={styles.rejectButton}>
-                  <Text style={styles.rejectText}>Отклонить</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.acceptButton}
-                  onPress={handleAcceptOrder}
-                >
-                  <Text style={styles.acceptText}>Принять заказ</Text>
-                </TouchableOpacity>
-              </>
-            )}
+          {order?.status == 'pending' && !accepted && (
+            <>
+              <TouchableOpacity style={styles.rejectButton}>
+                <Text style={styles.rejectText}>Отклонить</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.acceptButton}
+                onPress={handleAcceptOrder}
+              >
+                <Text style={styles.acceptText}>Принять заказ</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-            {order?.status == 'active' && accepted && location && (
-              <>
-                <TouchableOpacity style={styles.rejectButton}>
-                  <Text style={styles.rejectText}>Отклонить</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.acceptButton} onPress={handleArrivedOrder}>
-                  <Text style={styles.acceptText}>На месте</Text>
-                </TouchableOpacity>
-              </>
-            )}
+          {order?.status == 'active' && accepted && location && (
+            <>
+              <TouchableOpacity style={styles.rejectButton}>
+                <Text style={styles.rejectText}>Отклонить</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptButton} onPress={handleArrivedOrder}>
+                <Text style={styles.acceptText}>На месте</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-            {order?.status == 'arrived' &&
-              <>
-                <TouchableOpacity style={styles.acceptButton} onPress={handleStartedOrder}>
-                  <Text style={styles.acceptText}>Начать поездку</Text>
-                </TouchableOpacity>
-              </>
-            }
+          {order?.status == 'arrived' &&
+            <>
+              <TouchableOpacity style={styles.acceptButton} onPress={handleStartedOrder}>
+                <Text style={styles.acceptText}>Начать поездку</Text>
+              </TouchableOpacity>
+            </>
+          }
 
-            {order?.status == 'started' &&
-              <>
-                <TouchableOpacity style={styles.acceptButton} onPress={handleEndedOrder}>
-                  <Text style={styles.acceptText}>Завершить поездку</Text>
-                </TouchableOpacity>
-              </>
-            }
+          {order?.status == 'started' &&
+            <>
+              <TouchableOpacity style={styles.acceptButton} onPress={handleEndedOrder}>
+                <Text style={styles.acceptText}>Завершить поездку</Text>
+              </TouchableOpacity>
+            </>
+          }
 
-            {order?.status == 'ended' &&
-              <>
-                <TouchableOpacity style={styles.acceptButton}>
-                  <Text style={styles.acceptText}>Оценить</Text>
-                </TouchableOpacity>
-              </>
-            }
-
-          </>
+          {order?.status == 'ended' &&
+            <>
+              <TouchableOpacity style={styles.acceptButton}>
+                <Text style={styles.acceptText}>Оценить</Text>
+              </TouchableOpacity>
+            </>
+          }
         </BottomActionBar>
       </View>
     </TouchableWithoutFeedback >
