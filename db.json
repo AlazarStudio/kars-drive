@@ -34,6 +34,12 @@
       "fullName": "Иванов Иван Иванович",
       "position": "КВС",
       "rating": 5
+    },
+    {
+      "id": "1124",
+      "fullName": "Петров Сергей Иванович",
+      "position": "КВС",
+      "rating": 4.8
     }
   ],
   "orders": [
@@ -51,6 +57,21 @@
       "baggageInfo": "2 чемодана и клетка 40×50",
       "status": "active",
       "isActive": true
+    },
+    {
+      "id": "2",
+      "driverId": "90f1",
+      "clientId": "1123",
+      "avatar": "https://randomuser.me/api/portraits/men/32.jpg",
+      "fullName": "Александр",
+      "rating": 5,
+      "from": "проспект Ленина, 59, Черкесск, Карачаево-Черкесская Республика, Россия",
+      "to": "улица Ленина, 56, Минеральные Воды, Ставропольский край, Россия",
+      "departureTime": "2025-06-25T12:12:00",
+      "comment": "Нужна машина на 2 места и питомца",
+      "baggageInfo": "2 чемодана и клетка 40×50",
+      "status": "pending",
+      "isActive": false
     }
   ]
 }

@@ -114,7 +114,11 @@ export default function OrderDetailsScreen() {
   };
 
   const handleMapInteraction = () => {
-    if (isFollowing) setIsFollowing(false);
+    if (isFollowing) {
+      setIsFollowing(false);
+      locationSubscription.current?.remove();
+      locationSubscription.current = null;
+    }
   };
 
   const handleAddPoint = (point) => {
@@ -253,19 +257,22 @@ export default function OrderDetailsScreen() {
     }
   };
 
-
-  const startNavigation = async () => {
-    if (isNavigating || !location) return;
+  const toggleFollowAndRotate = async () => {
+    if (isFollowing) {
+      setIsFollowing(false);
+      locationSubscription.current?.remove();
+      locationSubscription.current = null;
+      return;
+    }
 
     try {
-      bottomSheetRef.current?.dismiss();
-      setIsNavigating(true);
-
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Ошибка', 'Нет доступа к геопозиции');
         return;
       }
+
+      setIsFollowing(true);
 
       locationSubscription.current = await Location.watchPositionAsync(
         {
@@ -274,43 +281,30 @@ export default function OrderDetailsScreen() {
           distanceInterval: 0,
         },
         (pos) => {
-          const newHeading = pos.coords.heading;
-          const now = Date.now();
+          const heading = pos.coords.heading ?? 0;
+          const coords = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
 
-          // 🔄 Обновляем heading, но не location напрямую
-          if (
-            typeof newHeading === 'number' &&
-            !isNaN(newHeading) &&
-            (lastHeading.current === null || Math.abs(newHeading - lastHeading.current) > 3) &&
-            now - lastUpdateTime.current > 1500
-          ) {
-            setCurrentHeading(newHeading);
-            lastHeading.current = newHeading;
-            lastUpdateTime.current = now;
-          }
-
-          // 🔁 Вращаем карту по heading
-          if (mapRef.current) {
-            mapRef.current.animateCamera({
-              center: {
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-              },
-              heading: newHeading || 0,
-              pitch: 0,
-              altitude: 1000,
-            });
-          }
+          mapRef.current?.animateCamera({
+            center: coords,
+            heading,
+            pitch: 0,
+            altitude: 1000,
+          });
         }
       );
     } catch (err) {
-      console.error('Ошибка запуска навигации:', err);
-      Alert.alert('Ошибка', 'Не удалось включить навигацию');
-      setIsNavigating(false);
+      Alert.alert('Ошибка', 'Не удалось получить позицию');
     }
   };
 
-
+  useEffect(() => {
+    return () => {
+      locationSubscription.current?.remove();
+    };
+  }, []);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -342,7 +336,7 @@ export default function OrderDetailsScreen() {
         </CustomMapView>
 
         <MyLocationButton
-          onPress={handleRecenter}
+          onPress={toggleFollowAndRotate}
           isFollowing={isFollowing}
           style={styles.myButton}
         />
@@ -442,16 +436,6 @@ export default function OrderDetailsScreen() {
                   onPress={buildRouteToOrder}
                 >
                   <Text style={styles.acceptText}>Построить маршрут до клиента</Text>
-                </TouchableOpacity>
-              )}
-
-
-              {buildRoute && !isNavigating && (
-                <TouchableOpacity
-                  style={[styles.acceptButton, { marginTop: 10 }]}
-                  onPress={startNavigation}
-                >
-                  <Text style={styles.acceptText}>Начать навигацию</Text>
                 </TouchableOpacity>
               )}
             </>
