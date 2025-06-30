@@ -8,12 +8,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSharedValue } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import SettingsSheet from '@/widgets/SettingsSheet';
+import ChangePasswordSheet from '@/widgets/ChangePasswordSheet';
+
 
 export default function ProfileComponent({ userInfo }) {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isOpened, setIsOpened] = useState(false);
+  const [isSettingOpened, setIsSettingOpened] = useState(false);
+  const [isPasswordOpened, setIsPasswordOpened] = useState(false);
+
+  const settingsRef = useRef(null);
+  const passwordRef = useRef(null);
 
   const snapPoints = useMemo(() => ['85%'], []);
   const isVisible = useSharedValue(0);
@@ -128,8 +135,13 @@ export default function ProfileComponent({ userInfo }) {
           </TouchableOpacity>
         }
 
-        {isOpened &&
+        {isSettingOpened &&
           <TouchableOpacity style={styles.backButton} onPress={() => bottomSheetRef.current?.dismiss()}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+        }
+        {isPasswordOpened &&
+          <TouchableOpacity style={styles.backButton} onPress={() => passwordRef.current?.dismiss()}>
             <Ionicons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
         }
@@ -141,16 +153,35 @@ export default function ProfileComponent({ userInfo }) {
           enablePanDownToClose={true}
           onAnimate={(fromIndex, toIndex) => {
             isVisible.value = toIndex >= 0 ? 1 : 0;
-            setIsOpened(toIndex >= 0 ? true : false)
+            setIsSettingOpened(toIndex >= 0 ? true : false)
+            setIsPasswordOpened(false)
           }}
         >
-          <BottomSheetScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.settingText}>Настройки</Text>
+          <BottomSheetScrollView>
+            <SettingsSheet user={user} onOpenChangePassword={() => passwordRef.current?.present()} />
           </BottomSheetScrollView>
         </BottomSheetModal>
+
+
+        <BottomSheetModal
+          ref={passwordRef}
+          index={1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          onAnimate={(fromIndex, toIndex) => {
+            isVisible.value = toIndex >= 0 ? 1 : 0;
+            setIsSettingOpened(true)
+            setIsPasswordOpened(toIndex >= 0 ? true : false)
+          }}
+        >
+          <BottomSheetScrollView>
+            <ChangePasswordSheet onClose={() => passwordRef.current?.dismiss()} />
+          </BottomSheetScrollView>
+        </BottomSheetModal>
+
       </View>
 
-      {isOpened && (
+      {(isSettingOpened || isPasswordOpened ) && (
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
@@ -166,9 +197,6 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     flex: 1,
-  },
-  content: {
-    padding: 16, paddingBottom: 100
   },
   avatar: {
     width: 80,
