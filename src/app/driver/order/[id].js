@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Polyline } from 'react-native-maps';
 import WaypointMarker from '@/map/WaypointMarker';
 import * as Location from 'expo-location';
-import { BallIndicator } from 'react-native-indicators';
+import YandexRouteFromAddress from '@/map/YandexRouteFromAddress';
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -534,6 +534,11 @@ export default function OrderDetailsScreen() {
                   <Text style={styles.label}>Информация о багаже</Text>
                   <Text style={styles.value}>{order.baggageInfo || 'Не указано'}</Text>
                 </View>
+
+                {/* <YandexRouteButton destinationLat={55.751244} destinationLon={37.618423} /> */}
+                {order.status == 'active' && <YandexRouteFromAddress destinationAddress={order.from} />}
+                {/* {order.status == 'started' && <YandexRouteFromAddress destinationAddress={order.to} />} */}
+
               </>
             ) : (
               <Text>Загрузка данных...</Text>
